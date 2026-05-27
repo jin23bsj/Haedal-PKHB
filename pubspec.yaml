@@ -1,0 +1,39 @@
+name: dream_achiever
+description: 꿈을 성취하기 위한 목표 관리 앱
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_generative_ai: ^0.4.3
+
+  # API 통신
+  dio: ^5.4.0
+
+  # 상태 관리
+  provider: ^6.1.1
+
+  # 차트 (달성률 시각화)
+  fl_chart: ^0.68.0
+
+  # 로컬 저장 (설정, 토큰 등)
+  shared_preferences: ^2.2.3
+
+  # 날짜 처리
+  intl: ^0.19.0
+
+  # 아이콘
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
