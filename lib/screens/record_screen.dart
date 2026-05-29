@@ -16,6 +16,7 @@ class RecordScreen extends StatefulWidget {
 
 class _RecordScreenState extends State<RecordScreen> {
   int _selectedEmotionIndex = 2;
+  DateTime _selectedDate = DateTime.now();
   final List<String> _selectedActions = [];
   final TextEditingController _memoController = TextEditingController();
   final TextEditingController _actionInputController = TextEditingController();
@@ -67,14 +68,33 @@ class _RecordScreenState extends State<RecordScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 날짜
+            // 날짜 (클릭하면 날짜 선택)
             Center(
-              child: Text(
-                DateFormat('yyyy년 M월 d일 (E)', 'ko').format(DateTime.now()),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+              child: GestureDetector(
+                onTap: _pickDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.calendar_today, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        DateFormat('yyyy년 M월 d일 (E)', 'ko').format(_selectedDate),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.primary),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -425,6 +445,30 @@ class _RecordScreenState extends State<RecordScreen> {
     );
   }
 
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
   void _addAction(String value) {
     final trimmed = value.trim();
     if (trimmed.isNotEmpty && !_selectedActions.contains(trimmed)) {
@@ -458,7 +502,7 @@ class _RecordScreenState extends State<RecordScreen> {
     // 1. 일일 기록 저장
     final emotion = Emotions.list[_selectedEmotionIndex];
     final record = DailyRecord(
-      date: DateTime.now(),
+      date: _selectedDate,
       emotion: emotion['emoji'],
       emotionScore: emotion['score'],
       actions: List.from(_selectedActions),
@@ -481,11 +525,15 @@ class _RecordScreenState extends State<RecordScreen> {
       if (goal.title.isNotEmpty) {
         final prevRate = goal.achievementRate;
         final memo = _goalMemos[goalId]?.text.trim() ?? '';
-        await goalProvider.updateGoal(goalId, goal.copyWith(achievementRate: newRate));
+        // 100% 달성 시 자동으로 완료 처리
+        final updatedGoal = newRate >= 1.0
+            ? goal.copyWith(achievementRate: 1.0, status: GoalStatus.completed)
+            : goal.copyWith(achievementRate: newRate);
+        await goalProvider.updateGoal(goalId, updatedGoal);
         goalProvider.addRateEntry(
           goalId: goalId,
           prevRate: prevRate,
-          newRate: newRate,
+          newRate: newRate >= 1.0 ? 1.0 : newRate,
           memo: memo,
         );
       }
@@ -502,6 +550,7 @@ class _RecordScreenState extends State<RecordScreen> {
       // 초기화
       setState(() {
         _selectedEmotionIndex = 2;
+        _selectedDate = DateTime.now();
         _selectedActions.clear();
         _memoController.clear();
         for (final c in _goalMemos.values) {

@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildStreakCard() {
     return Consumer<RecordProvider>(
       builder: (context, provider, _) {
-        final streak = provider.summary['streak'] ?? 0;
+        final streak = provider.streakDays;
         final topAction = provider.summary['topAction'] ?? '-';
         return Container(
           width: double.infinity,

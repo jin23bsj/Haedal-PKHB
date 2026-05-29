@@ -87,6 +87,38 @@ class RecordProvider extends ChangeNotifier {
         r.date.day == today.day);
   }
 
+  // 총 기록일 수
+  int get totalRecordDays => _records.length;
+
+  // 연속 기록일 (오늘 또는 어제부터 역순으로 연속된 날 수)
+  int get streakDays {
+    if (_records.isEmpty) return 0;
+
+    // 날짜만 추출해서 최신순 정렬 (중복 제거)
+    final dates = _records
+        .map((r) => DateTime(r.date.year, r.date.month, r.date.day))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    // 오늘 또는 어제 기록이 없으면 streak 0
+    if (dates.first != today && dates.first != yesterday) return 0;
+
+    int streak = 1;
+    for (int i = 0; i < dates.length - 1; i++) {
+      final diff = dates[i].difference(dates[i + 1]).inDays;
+      if (diff == 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
   // 최근 7일 기록
   List<DailyRecord> get recentRecords {
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));

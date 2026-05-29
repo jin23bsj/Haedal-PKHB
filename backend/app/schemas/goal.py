@@ -23,12 +23,14 @@ class GoalUpdate(BaseModel):
     category: Optional[str] = None
     target_date: Optional[date] = None
     status: Optional[GoalStatus] = None
+    achievement_rate: Optional[float] = Field(None, ge=0.0, le=1.0)
 
 
 class GoalResponse(GoalBase):
     id: int
     user_id: int
     status: GoalStatus
+    achievement_rate: float = 0.0
     created_at: datetime
     updated_at: datetime
 

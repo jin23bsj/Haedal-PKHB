@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 환경변수 (API 키 포함) - 절대 커밋 금지
+backend/.env
+.env
+*.env

@@ -72,8 +72,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     return Consumer<RecordProvider>(
       builder: (context, provider, _) {
         final summary = provider.summary;
-        final streak = summary['streak'] ?? 0;
-        final totalDays = summary['totalDays'] ?? 0;
+        // 로컬 기록으로 직접 계산 (백엔드 summary보다 정확)
+        final streak = provider.streakDays;
+        final totalDays = provider.totalRecordDays;
         final topActions = (summary['topActions'] as List?)?.take(3).toList() ?? [];
 
         return Container(

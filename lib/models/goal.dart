@@ -11,7 +11,7 @@ class Goal {
   final String? category;
   final DateTime? targetDate;
   final String status;
-  final double achievementRate; // UI 전용 (0.0~1.0), 백엔드 전송 안 함
+  final double achievementRate; // 0.0~1.0, 백엔드 achievement_rate와 연동
   final DateTime createdAt;
 
   Goal({
@@ -37,7 +37,7 @@ class Goal {
           ? DateTime.parse(json['target_date'])
           : null,
       status: json['status'] ?? GoalStatus.active,
-      achievementRate: 0.0, // 백엔드에 없는 필드 → 기본값
+      achievementRate: (json['achievement_rate'] as num?)?.toDouble() ?? 0.0,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -64,6 +64,7 @@ class Goal {
       if (targetDate != null)
         'target_date': targetDate!.toIso8601String().split('T').first,
       'status': status,
+      'achievement_rate': achievementRate,
     };
   }
 

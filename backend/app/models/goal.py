@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -23,6 +23,7 @@ class Goal(Base):
     category = Column(String, nullable=True)  # 건강, 학업, 커리어, 관계 etc.
     target_date = Column(Date, nullable=True)
     status = Column(Enum(GoalStatus), default=GoalStatus.active, nullable=False)
+    achievement_rate = Column(Float, default=0.0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
