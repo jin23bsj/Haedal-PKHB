@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../models/daily_record.dart';
 import 'api_service.dart';
 
@@ -21,8 +22,19 @@ class RecordService {
   }
 
   Future<DailyRecord> createRecord(DailyRecord record) async {
-    final res = await _dio.post('/records', data: record.toJson());
-    return DailyRecord.fromJson(res.data);
+    try {
+      final res = await _dio.post('/records', data: record.toJson());
+      return DailyRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      // 오늘 기록이 이미 있으면 → 기존 기록 찾아서 PATCH로 수정
+      if (e.response?.statusCode == 400) {
+        final existing = await getRecordByDate(record.date);
+        if (existing?.id != null) {
+          return await updateRecord(existing!.id!, record);
+        }
+      }
+      rethrow;
+    }
   }
 
   // 백엔드는 PATCH 사용

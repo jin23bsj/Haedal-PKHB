@@ -67,6 +67,9 @@ class ApiService {
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
+  // auth_provider, auth_service에서 사용하는 공개 버전
+  static void setToken(String token) => _setToken(token);
+
   static void clearToken() {
     _dio.options.headers.remove('Authorization');
   }

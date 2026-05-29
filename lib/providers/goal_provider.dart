@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/goal.dart';
 import '../models/goal_rate_entry.dart';
 import '../services/goal_service.dart';
@@ -58,14 +60,47 @@ class GoalProvider extends ChangeNotifier {
   // 목표별 달성률 히스토리: goalId → [GoalRateEntry, ...]
   final Map<int, List<GoalRateEntry>> _rateHistory = {};
 
+  // 로컬 저장된 달성률: goalId → achievementRate
+  final Map<int, double> _localRates = {};
+
   List<Goal> get goals => _goals;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
   // 특정 목표의 히스토리 (최신순)
   List<GoalRateEntry> getHistory(int goalId) {
-    return (_rateHistory[goalId] ?? [])
+    return List.from(_rateHistory[goalId] ?? [])
       ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  // SharedPreferences에서 로컬 달성률 불러오기
+  Future<void> _loadLocalRates() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('goal_rates');
+    if (raw != null) {
+      final map = json.decode(raw) as Map<String, dynamic>;
+      map.forEach((k, v) {
+        _localRates[int.parse(k)] = (v as num).toDouble();
+      });
+    }
+  }
+
+  // SharedPreferences에 로컬 달성률 저장
+  Future<void> _saveLocalRates() async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = <String, double>{};
+    _localRates.forEach((k, v) => map[k.toString()] = v);
+    await prefs.setString('goal_rates', json.encode(map));
+  }
+
+  // 백엔드에서 받은 목표에 로컬 달성률 합치기
+  List<Goal> _mergeRates(List<Goal> goals) {
+    return goals.map((g) {
+      if (g.id != null && _localRates.containsKey(g.id)) {
+        return g.copyWith(achievementRate: _localRates[g.id!]!);
+      }
+      return g;
+    }).toList();
   }
 
   // 기록 탭에서 저장할 때 호출 — 메모나 달성률 변화가 있을 때만 저장
@@ -81,7 +116,7 @@ class GoalProvider extends ChangeNotifier {
       newRate: newRate,
       memo: memo,
     );
-    if (!entry.shouldShow) return; // 변화 없고 메모도 없으면 저장 안 함
+    if (!entry.shouldShow) return;
     _rateHistory.putIfAbsent(goalId, () => []).add(entry);
     notifyListeners();
   }
@@ -104,11 +139,13 @@ class GoalProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    await _loadLocalRates();
+
     try {
-      _goals = await _service.getGoals();
+      final fetched = await _service.getGoals();
+      _goals = _mergeRates(fetched);
     } catch (e) {
-      // 백엔드 연결 안 됐을 때 → 샘플 데이터로 대체
-      _goals = _mockGoals;
+      _goals = _mergeRates(_mockGoals);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -122,7 +159,6 @@ class GoalProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      // 백엔드 없을 때도 로컬에서 추가
       final localGoal = goal.copyWith(id: DateTime.now().millisecondsSinceEpoch);
       _goals.insert(0, localGoal);
       notifyListeners();
@@ -131,16 +167,20 @@ class GoalProvider extends ChangeNotifier {
   }
 
   Future<bool> updateGoal(int id, Goal goal) async {
+    // 달성률은 로컬에 저장
+    _localRates[id] = goal.achievementRate;
+    await _saveLocalRates();
+
     try {
       final updated = await _service.updateGoal(id, goal);
       final index = _goals.indexWhere((g) => g.id == id);
       if (index != -1) {
-        _goals[index] = updated;
+        // 백엔드 응답에 달성률 다시 적용
+        _goals[index] = updated.copyWith(achievementRate: goal.achievementRate);
         notifyListeners();
       }
       return true;
     } catch (e) {
-      // 백엔드 없을 때도 로컬에서 수정
       final index = _goals.indexWhere((g) => g.id == id);
       if (index != -1) {
         _goals[index] = goal.copyWith(id: id);
@@ -151,13 +191,15 @@ class GoalProvider extends ChangeNotifier {
   }
 
   Future<bool> deleteGoal(int id) async {
+    _localRates.remove(id);
+    await _saveLocalRates();
+
     try {
       await _service.deleteGoal(id);
       _goals.removeWhere((g) => g.id == id);
       notifyListeners();
       return true;
     } catch (e) {
-      // 백엔드 없을 때도 로컬에서 삭제
       _goals.removeWhere((g) => g.id == id);
       notifyListeners();
       return true;
