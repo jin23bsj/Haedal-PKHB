@@ -110,7 +110,11 @@ class GoalDetailScreen extends StatelessWidget {
         ? provider.goals.firstWhere((g) => g.id == goal.id, orElse: () => goal)
         : goal;
 
-    final daysLeft = liveGoal.targetDate?.difference(DateTime.now()).inDays;
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final daysLeft = liveGoal.targetDate != null
+        ? DateTime(liveGoal.targetDate!.year, liveGoal.targetDate!.month, liveGoal.targetDate!.day)
+            .difference(today).inDays
+        : null;
     final percent = (liveGoal.achievementRate * 100).toInt();
 
     return Container(

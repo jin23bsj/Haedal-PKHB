@@ -99,7 +99,12 @@ class _GoalListScreenState extends State<GoalListScreen>
   }
 
   Widget _buildGoalCard(Goal goal, BuildContext context) {
-    final daysLeft = goal.targetDate?.difference(DateTime.now()).inDays;
+    // 시각 제거하고 날짜만 비교 (오늘=0, 내일=1, 어제=-1)
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final daysLeft = goal.targetDate != null
+        ? DateTime(goal.targetDate!.year, goal.targetDate!.month, goal.targetDate!.day)
+            .difference(today).inDays
+        : null;
 
     return GestureDetector(
       onTap: () => Navigator.push(
