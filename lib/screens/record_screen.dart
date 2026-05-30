@@ -8,7 +8,11 @@ import '../providers/record_provider.dart';
 import '../providers/goal_provider.dart';
 
 class RecordScreen extends StatefulWidget {
-  const RecordScreen({super.key});
+  final DailyRecord? record; // null이면 새 기록, 아니면 수정 모드
+
+  const RecordScreen({super.key, this.record});
+
+  bool get isEditMode => record != null;
 
   @override
   State<RecordScreen> createState() => _RecordScreenState();
@@ -20,11 +24,12 @@ class _RecordScreenState extends State<RecordScreen> {
   final List<String> _selectedActions = [];
   final TextEditingController _memoController = TextEditingController();
   final TextEditingController _actionInputController = TextEditingController();
+  final TextEditingController _futureMessageController = TextEditingController();
   bool _isLoading = false;
 
   // 목표별 달성률 & 내용 메모
-  final Map<int, double> _goalRates = {};       // goalId → 달성률 (0.0~1.0)
-  final Map<int, TextEditingController> _goalMemos = {}; // goalId → 내용 입력
+  final Map<int, double> _goalRates = {};
+  final Map<int, TextEditingController> _goalMemos = {};
 
   final List<String> _suggestedActions = [
     '운동', '독서', '공부', '명상', '산책', '요리',
@@ -34,6 +39,18 @@ class _RecordScreenState extends State<RecordScreen> {
   @override
   void initState() {
     super.initState();
+
+    // 수정 모드일 때 기존 데이터 불러오기
+    final record = widget.record;
+    if (record != null) {
+      _selectedDate = record.date;
+      final emotionIndex = Emotions.list.indexWhere((e) => e['emoji'] == record.emotion);
+      if (emotionIndex != -1) _selectedEmotionIndex = emotionIndex;
+      _selectedActions.addAll(record.actions);
+      _memoController.text = record.memo;
+      _futureMessageController.text = record.futureMessage;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GoalProvider>().fetchGoals();
     });
@@ -43,6 +60,7 @@ class _RecordScreenState extends State<RecordScreen> {
   void dispose() {
     _memoController.dispose();
     _actionInputController.dispose();
+    _futureMessageController.dispose();
     for (final c in _goalMemos.values) {
       c.dispose();
     }
@@ -54,7 +72,9 @@ class _RecordScreenState extends State<RecordScreen> {
     for (final goal in goals) {
       if (goal.id != null && !_goalRates.containsKey(goal.id)) {
         _goalRates[goal.id!] = goal.achievementRate;
-        _goalMemos[goal.id!] = TextEditingController();
+        _goalMemos[goal.id!] = TextEditingController(
+          text: widget.record?.goalProgressMemos[goal.id!] ?? '',
+        );
       }
     }
   }
@@ -62,7 +82,15 @@ class _RecordScreenState extends State<RecordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('오늘 기록')),
+      appBar: AppBar(
+        title: Text(widget.isEditMode ? '기록 수정' : '오늘 기록'),
+        leading: widget.isEditMode
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -135,6 +163,23 @@ class _RecordScreenState extends State<RecordScreen> {
                 hintText: '오늘 하루를 돌아보며 한 마디...',
               ),
             ),
+            const SizedBox(height: 24),
+
+            // 미래의 나에게 한마디
+            _buildSectionTitle('💌 미래의 나에게 한마디 (선택)'),
+            const SizedBox(height: 4),
+            const Text(
+              '분석 탭에서 나중에 다시 볼 수 있어요',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _futureMessageController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: '미래의 나에게 전하고 싶은 말...',
+              ),
+            ),
             const SizedBox(height: 36),
 
             // 저장 버튼
@@ -151,7 +196,7 @@ class _RecordScreenState extends State<RecordScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text('기록 저장하기'),
+                    : Text(widget.isEditMode ? '수정 저장하기' : '기록 저장하기'),
               ),
             ),
             const SizedBox(height: 20),
@@ -501,12 +546,22 @@ class _RecordScreenState extends State<RecordScreen> {
 
     // 1. 일일 기록 저장
     final emotion = Emotions.list[_selectedEmotionIndex];
+    // 목표별 메모를 goalProgressMemos로 수집
+    final goalProgressMemos = <int, String>{};
+    for (final entry in _goalMemos.entries) {
+      final memo = entry.value.text.trim();
+      if (memo.isNotEmpty) goalProgressMemos[entry.key] = memo;
+    }
     final record = DailyRecord(
+      id: widget.record?.id, // 수정 모드면 기존 id 유지
       date: _selectedDate,
       emotion: emotion['emoji'],
       emotionScore: emotion['score'],
       actions: List.from(_selectedActions),
       memo: _memoController.text.trim(),
+      futureMessage: _futureMessageController.text.trim(),
+      relatedGoalIds: _goalRates.keys.toList(),
+      goalProgressMemos: goalProgressMemos,
     );
     await context.read<RecordProvider>().createRecord(record);
 
@@ -542,17 +597,22 @@ class _RecordScreenState extends State<RecordScreen> {
     if (mounted) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('오늘 기록이 저장됐어요 🌱'),
+        SnackBar(
+          content: Text(widget.isEditMode ? '기록이 수정됐어요 ✏️' : '오늘 기록이 저장됐어요 🌱'),
           backgroundColor: AppColors.primary,
         ),
       );
-      // 초기화
+      if (widget.isEditMode) {
+        Navigator.pop(context, true); // 수정 모드면 뒤로가기
+        return;
+      }
+      // 새 기록이면 초기화
       setState(() {
         _selectedEmotionIndex = 2;
         _selectedDate = DateTime.now();
         _selectedActions.clear();
         _memoController.clear();
+        _futureMessageController.clear();
         for (final c in _goalMemos.values) {
           c.clear();
         }

@@ -23,6 +23,8 @@ class DailyRecord(Base):
     note = Column(Text, nullable=True)
     related_goal_ids = Column(JSON, default=list)              # [1, 2, 3]
     achievement_score = Column(Float, nullable=True)           # 0~100, 자가평가 진행도
+    future_message = Column(Text, nullable=True)
+    goal_progress_memos = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="records")

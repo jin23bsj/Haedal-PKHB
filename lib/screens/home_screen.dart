@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../models/daily_record.dart';
 import '../providers/goal_provider.dart';
 import '../providers/record_provider.dart';
+import 'record_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -99,14 +101,23 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.primaryLight,
-            borderRadius: BorderRadius.circular(22),
-          ),
-          child: const Icon(Icons.person, color: AppColors.primary, size: 24),
+        Row(
+          children: [
+            IconButton(
+              onPressed: () => _openRecordCalendar(context),
+              icon: const Icon(Icons.calendar_month, color: AppColors.primary),
+              tooltip: '날짜별 기록 보기',
+            ),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: const Icon(Icons.person, color: AppColors.primary, size: 24),
+            ),
+          ],
         ),
       ],
     );
@@ -156,24 +167,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    '자주 한 행동',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    topAction,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         );
@@ -185,6 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<RecordProvider>(
       builder: (context, provider, _) {
         final hasRecord = provider.hasTodayRecord;
+        final todayRecord = provider.todayRecord;
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -221,10 +215,95 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              if (!hasRecord)
-                const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
+              if (hasRecord && todayRecord != null)
+                TextButton(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RecordScreen(record: todayRecord),
+                      ),
+                    );
+                    if (result == true && context.mounted) {
+                      await context.read<RecordProvider>().fetchRecords();
+                      await context.read<RecordProvider>().fetchSummary();
+                    }
+                  },
+                  child: const Text(
+                    '수정하기',
+                    style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openRecordCalendar(BuildContext context) async {
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
+      locale: const Locale('ko'),
+    );
+    if (selectedDate == null || !context.mounted) return;
+
+    final records = context.read<RecordProvider>().records;
+    final record = records.where((r) =>
+        r.date.year == selectedDate.year &&
+        r.date.month == selectedDate.month &&
+        r.date.day == selectedDate.day).firstOrNull;
+
+    if (!context.mounted) return;
+    _showRecordPreviewDialog(context, selectedDate, record);
+  }
+
+  void _showRecordPreviewDialog(BuildContext context, DateTime date, DailyRecord? record) {
+    final dateText = DateFormat('yyyy년 M월 d일 (E)', 'ko').format(date);
+    showDialog(
+      context: context,
+      builder: (_) {
+        if (record == null) {
+          return AlertDialog(
+            title: Text(dateText),
+            content: const Text('해당 날짜의 기록이 없어요.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인')),
+            ],
+          );
+        }
+        return AlertDialog(
+          title: Text(dateText),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${DateFormat('M월 d일', 'ko').format(date)}의 감정  ${record.emotion}',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              Text('한 행동: ${record.actions.isEmpty ? '없음' : record.actions.join(', ')}'),
+              if (record.memo.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text('한 줄 메모', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(record.memo),
+              ],
+              if (record.futureMessage.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text('미래의 나에게 남긴 한마디', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(record.futureMessage),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('닫기')),
+          ],
         );
       },
     );

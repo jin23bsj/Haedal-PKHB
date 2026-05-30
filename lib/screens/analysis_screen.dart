@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme.dart';
+import '../models/goal.dart';
 import '../providers/goal_provider.dart';
 import '../providers/record_provider.dart';
 
@@ -39,9 +40,15 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           children: [
             _buildGrowthSummary(),
             const SizedBox(height: 24),
+            _buildFutureMessageCard(),
+            const SizedBox(height: 24),
             _buildSectionTitle('🎯 목표 달성률'),
             const SizedBox(height: 12),
             _buildGoalChart(),
+            const SizedBox(height: 24),
+            _buildSectionTitle('🔗 목표와 연결된 기록'),
+            const SizedBox(height: 12),
+            _buildGoalLinkedRecordsCard(),
             const SizedBox(height: 24),
             _buildSectionTitle('📈 감정 변화 (최근 14일)'),
             const SizedBox(height: 12),
@@ -469,5 +476,166 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
       ),
     );
+  }
+
+  // 💌 미래의 나에게 남긴 한마디 카드
+  Widget _buildFutureMessageCard() {
+    return Consumer<RecordProvider>(
+      builder: (context, provider, _) {
+        final recordsWithMessage = provider.records
+            .where((r) => r.futureMessage.trim().isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+
+        if (recordsWithMessage.isEmpty) {
+          return _buildEmptyCard('기록할 때 미래의 나에게 한마디를 남기면 이곳에 모여요.');
+        }
+
+        final latest = recordsWithMessage.first;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '💌 미래의 나에게 남긴 최근 한마디',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '"${latest.futureMessage}"',
+                style: const TextStyle(
+                  fontSize: 15, height: 1.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${latest.date.month}월 ${latest.date.day}일의 내가 남긴 기록이에요.',
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 🔗 목표와 연결된 기록 카드
+  Widget _buildGoalLinkedRecordsCard() {
+    return Consumer2<RecordProvider, GoalProvider>(
+      builder: (context, recordProvider, goalProvider, _) {
+        final linkedRecords = recordProvider.records
+            .where((r) => r.relatedGoalIds.isNotEmpty)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
+
+        if (linkedRecords.isEmpty) {
+          return _buildEmptyCard('오늘 기록에서 목표 점검을 남기면 목표와 기록이 연결돼요.');
+        }
+
+        // 가장 많이 연결된 목표 찾기
+        final goalCounts = <int, int>{};
+        for (final r in linkedRecords) {
+          for (final id in r.relatedGoalIds) {
+            goalCounts[id] = (goalCounts[id] ?? 0) + 1;
+          }
+        }
+        int? topGoalId;
+        int topCount = 0;
+        for (final e in goalCounts.entries) {
+          if (e.value > topCount) { topGoalId = e.key; topCount = e.value; }
+        }
+        final topGoal = topGoalId == null ? null : _findGoalById(goalProvider.goals, topGoalId);
+
+        final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+        final recentCount = linkedRecords.where((r) => r.date.isAfter(sevenDaysAgo)).length;
+        final trendMsg = recentCount >= 3
+            ? '최근 7일 동안 목표와 연결된 행동이 꾸준히 쌓이고 있어요.'
+            : recentCount > 0
+                ? '최근 7일 동안 목표와 연결된 기록이 ${recentCount}개 쌓였어요.'
+                : '최근 기록은 없지만, 이전에 목표와 연결된 기록이 남아 있어요.';
+
+        final recentRecords = linkedRecords.take(3).toList();
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [BoxShadow(color: AppColors.cardShadow, blurRadius: 10, offset: const Offset(0, 3))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '총 ${linkedRecords.length}개의 기록이 목표와 연결됐어요.',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 8),
+              if (topGoal != null)
+                Text('가장 많이 연결된 목표는 "${topGoal.title}"예요.',
+                    style: const TextStyle(fontSize: 13, height: 1.4, color: AppColors.textSecondary))
+              else
+                const Text('목표와 연결된 기록이 쌓이고 있어요.',
+                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              const SizedBox(height: 6),
+              Text(trendMsg, style: const TextStyle(fontSize: 13, height: 1.4, color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              const Text('최근 연결 기록',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const SizedBox(height: 10),
+              ...recentRecords.map((record) {
+                final goalTitles = record.relatedGoalIds.map((id) {
+                  final g = _findGoalById(goalProvider.goals, id);
+                  return g?.title ?? '연결된 목표';
+                }).toList();
+                final summary = goalTitles.length > 1
+                    ? '${goalTitles.first} 외 ${goalTitles.length - 1}개 목표'
+                    : goalTitles.isNotEmpty ? goalTitles.first : '연결된 목표';
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('🎯', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${record.date.month}월 ${record.date.day}일 · $summary',
+                          style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              if (linkedRecords.length > 3) ...[
+                const SizedBox(height: 6),
+                Text('외 ${linkedRecords.length - 3}개의 연결 기록이 더 있어요.',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Goal? _findGoalById(List<Goal> goals, int goalId) {
+    try { return goals.firstWhere((g) => g.id == goalId); } catch (_) { return null; }
   }
 }

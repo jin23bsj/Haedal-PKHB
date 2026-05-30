@@ -87,6 +87,19 @@ class RecordProvider extends ChangeNotifier {
         r.date.day == today.day);
   }
 
+  // 오늘 기록 객체
+  DailyRecord? get todayRecord {
+    final today = DateTime.now();
+    try {
+      return _records.firstWhere((r) =>
+          r.date.year == today.year &&
+          r.date.month == today.month &&
+          r.date.day == today.day);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // 총 기록일 수
   int get totalRecordDays => _records.length;
 
