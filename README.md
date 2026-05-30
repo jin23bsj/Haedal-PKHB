@@ -5,6 +5,9 @@
 > 
 
 ---
+## 📱 시연 영상
+
+[![Dream Achiever 시연 영상](https://img.youtube.com/vi/g0nbsWk9lD8/0.jpg)](https://youtu.be/g0nbsWk9lD8)
 
 ## 📌 프로젝트 개요
 
