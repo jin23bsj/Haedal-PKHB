@@ -25,6 +25,7 @@ class DailyRecord(Base):
     achievement_score = Column(Float, nullable=True)           # 0~100, 자가평가 진행도
     future_message = Column(Text, nullable=True)
     goal_progress_memos = Column(JSON, default=dict)
+    goal_rates = Column(JSON, default=dict)  # {goalId: rate} 목표별 달성률 스냅샷
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="records")

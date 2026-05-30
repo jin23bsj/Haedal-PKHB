@@ -19,6 +19,7 @@ class DailyRecordBase(BaseModel):
         
     achievement_score: Optional[float] = Field(None, ge=0, le=100, description="오늘의 목표 진행도 자가평가 0~100")
     future_message: Optional[str] = Field(None, description="미래의 나에게 남기는 한마디")
+    goal_rates: Dict[str, float] = Field(default_factory=dict, description="목표별 달성률 스냅샷. 예: {'1': 0.5}")
 
 
 class DailyRecordCreate(DailyRecordBase):
@@ -34,6 +35,7 @@ class DailyRecordUpdate(BaseModel):
     goal_progress_memos: Optional[Dict[str, str]] = None
     achievement_score: Optional[float] = Field(None, ge=0, le=100)
     future_message: Optional[str] = None
+    goal_rates: Optional[Dict[str, float]] = None
 
 
 class DailyRecordResponse(DailyRecordBase):

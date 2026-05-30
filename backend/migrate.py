@@ -27,6 +27,7 @@ def migrate():
         ("goals", "achievement_rate", "REAL NOT NULL DEFAULT 0.0"),
         ("daily_records", "future_message", "TEXT"),
         ("daily_records", "goal_progress_memos", "JSON DEFAULT '{}'"),
+        ("daily_records", "goal_rates", "JSON DEFAULT '{}'"),
     ]
 
     for table, column, definition in migrations:

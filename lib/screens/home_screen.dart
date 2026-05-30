@@ -20,7 +20,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GoalProvider>().fetchGoals();
-      context.read<RecordProvider>().fetchRecords();
+      context.read<RecordProvider>().fetchRecords(
+        onLoaded: (records) {
+          context.read<GoalProvider>().rebuildHistoryFromRecords(
+            records.cast(),
+          );
+        },
+      );
       context.read<RecordProvider>().fetchSummary();
     });
   }

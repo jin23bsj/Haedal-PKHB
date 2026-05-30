@@ -139,7 +139,7 @@ class RecordProvider extends ChangeNotifier {
       ..sort((a, b) => b.date.compareTo(a.date));
   }
 
-  Future<void> fetchRecords() async {
+  Future<void> fetchRecords({Function(List<dynamic>)? onLoaded}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -147,12 +147,13 @@ class RecordProvider extends ChangeNotifier {
     try {
       _records = await _service.getRecords();
     } catch (e) {
-      // 백엔드 연결 안 됐을 때 → 샘플 데이터로 대체
       _records = _buildMockRecords();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+    // 기록 로드 후 콜백 (GoalProvider 히스토리 복원에 사용)
+    onLoaded?.call(_records);
   }
 
   Future<void> fetchSummary() async {

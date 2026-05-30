@@ -562,6 +562,7 @@ class _RecordScreenState extends State<RecordScreen> {
       futureMessage: _futureMessageController.text.trim(),
       relatedGoalIds: _goalRates.keys.toList(),
       goalProgressMemos: goalProgressMemos,
+      goalRates: Map.from(_goalRates), // 목표별 달성률 스냅샷 저장
     );
     await context.read<RecordProvider>().createRecord(record);
 

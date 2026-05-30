@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/goal.dart';
 import '../models/goal_rate_entry.dart';
+import '../models/daily_record.dart';
 import '../services/goal_service.dart';
 
 // ✅ 백엔드 연결 전 UI 테스트용 샘플 데이터
@@ -85,12 +86,96 @@ class GoalProvider extends ChangeNotifier {
     }
   }
 
+  // SharedPreferences에서 히스토리 불러오기
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('goal_rate_history');
+    if (raw == null) return;
+    try {
+      final map = json.decode(raw) as Map<String, dynamic>;
+      map.forEach((goalIdStr, entries) {
+        final goalId = int.tryParse(goalIdStr);
+        if (goalId == null) return;
+        final list = (entries as List).map((e) {
+          final m = e as Map<String, dynamic>;
+          return GoalRateEntry(
+            date: DateTime.parse(m['date']),
+            prevRate: (m['prevRate'] as num).toDouble(),
+            newRate: (m['newRate'] as num).toDouble(),
+            memo: m['memo'] ?? '',
+          );
+        }).toList();
+        _rateHistory[goalId] = list;
+      });
+    } catch (_) {}
+  }
+
+  // SharedPreferences에 히스토리 저장
+  Future<void> _saveHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = <String, dynamic>{};
+    _rateHistory.forEach((goalId, entries) {
+      map[goalId.toString()] = entries.map((e) => {
+        'date': e.date.toIso8601String(),
+        'prevRate': e.prevRate,
+        'newRate': e.newRate,
+        'memo': e.memo,
+      }).toList();
+    });
+    await prefs.setString('goal_rate_history', json.encode(map));
+  }
+
   // SharedPreferences에 로컬 달성률 저장
   Future<void> _saveLocalRates() async {
     final prefs = await SharedPreferences.getInstance();
     final map = <String, double>{};
     _localRates.forEach((k, v) => map[k.toString()] = v);
     await prefs.setString('goal_rates', json.encode(map));
+  }
+
+  // 일일 기록 데이터로 히스토리 복원 (앱 시작 시 호출)
+  void rebuildHistoryFromRecords(List<DailyRecord> records) {
+    // goalRates가 있는 기록만 처리, 날짜 오름차순
+    final sorted = records
+        .where((r) => r.goalRates.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    // 기존 SharedPreferences 히스토리가 있으면 스킵 (이미 있는 데이터 우선)
+    if (_rateHistory.isNotEmpty) return;
+
+    final Map<int, double> prevRates = {};
+
+    for (final record in sorted) {
+      record.goalRates.forEach((goalId, newRate) {
+        final prevRate = prevRates[goalId] ?? 0.0;
+        final memo = record.goalProgressMemos[goalId] ?? '';
+        final entry = GoalRateEntry(
+          date: record.date,
+          prevRate: prevRate,
+          newRate: newRate,
+          memo: memo,
+        );
+        if (entry.shouldShow) {
+          final list = _rateHistory.putIfAbsent(goalId, () => []);
+          final sameDay = list.indexWhere((e) =>
+              e.date.year == record.date.year &&
+              e.date.month == record.date.month &&
+              e.date.day == record.date.day);
+          if (sameDay != -1) {
+            list[sameDay] = entry;
+          } else {
+            list.add(entry);
+          }
+        }
+        prevRates[goalId] = newRate;
+      });
+    }
+
+    if (_rateHistory.isNotEmpty) {
+      notifyListeners();
+      _saveHistory();
+    }
   }
 
   // 백엔드에서 받은 목표에 로컬 달성률 합치기
@@ -119,7 +204,19 @@ class GoalProvider extends ChangeNotifier {
       memo: memo,
     );
     if (!entry.shouldShow) return;
-    _rateHistory.putIfAbsent(goalId, () => []).add(entry);
+
+    final list = _rateHistory.putIfAbsent(goalId, () => []);
+
+    // 같은 날짜 항목이 있으면 덮어쓰기 (수정 모드 대응)
+    final sameDay = list.indexWhere((e) =>
+        e.date.year == entryDate.year &&
+        e.date.month == entryDate.month &&
+        e.date.day == entryDate.day);
+    if (sameDay != -1) {
+      list[sameDay] = entry; // 기존 항목 갱신
+    } else {
+      list.add(entry); // 새 날짜면 추가
+    }
 
     // 가장 최신 날짜 entry의 newRate로 goal 달성률 업데이트
     final history = _rateHistory[goalId]!;
@@ -130,6 +227,8 @@ class GoalProvider extends ChangeNotifier {
       _localRates[goalId] = latestEntry.newRate;
       _saveLocalRates();
     }
+
+    _saveHistory(); // 히스토리 로컬 저장
 
     notifyListeners();
   }
@@ -153,6 +252,7 @@ class GoalProvider extends ChangeNotifier {
     notifyListeners();
 
     await _loadLocalRates();
+    await _loadHistory();
 
     try {
       final fetched = await _service.getGoals();

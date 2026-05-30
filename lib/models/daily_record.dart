@@ -7,6 +7,7 @@ class DailyRecord {
   final String memo;
   final List<int> relatedGoalIds;
   final Map<int, String> goalProgressMemos;
+  final Map<int, double> goalRates;
   final double? achievementScore;
   final String futureMessage;
   final DateTime createdAt;
@@ -20,6 +21,7 @@ class DailyRecord {
     this.memo = '',
     this.relatedGoalIds = const [],
     this.goalProgressMemos = const {},
+    this.goalRates = const {},
     this.achievementScore,
     this.futureMessage = '',
     DateTime? createdAt,
@@ -42,6 +44,17 @@ class DailyRecord {
       });
     }
 
+    final parsedGoalRates = <int, double>{};
+    final rawGoalRates = json['goal_rates'];
+    if (rawGoalRates is Map) {
+      rawGoalRates.forEach((key, value) {
+        final id = int.tryParse(key.toString());
+        if (id != null && value != null) {
+          parsedGoalRates[id] = (value as num).toDouble();
+        }
+      });
+    }
+
     return DailyRecord(
       id: json['id'],
       date: json['record_date'] != null
@@ -53,6 +66,7 @@ class DailyRecord {
       memo: json['note'] ?? '',
       relatedGoalIds: List<int>.from(json['related_goal_ids'] ?? []),
       goalProgressMemos: parsedGoalMemos,
+      goalRates: parsedGoalRates,
       achievementScore: (json['achievement_score'] as num?)?.toDouble(),
       futureMessage: json['future_message'] ?? '',
       createdAt: json['created_at'] != null
@@ -70,6 +84,9 @@ class DailyRecord {
       'note': memo,
       'related_goal_ids': relatedGoalIds,
       'goal_progress_memos': goalProgressMemos.map(
+        (key, value) => MapEntry(key.toString(), value),
+      ),
+      'goal_rates': goalRates.map(
         (key, value) => MapEntry(key.toString(), value),
       ),
       if (achievementScore != null) 'achievement_score': achievementScore,
