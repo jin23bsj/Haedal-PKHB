@@ -12,6 +12,7 @@ import 'screens/goal_list_screen.dart';
 import 'screens/record_screen.dart';
 import 'screens/analysis_screen.dart';
 import 'screens/chat_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +42,7 @@ class DreamAchieverApp extends StatelessWidget {
         ],
         supportedLocales: const [Locale('ko'), Locale('en')],
         locale: const Locale('ko'),
-        home: const MainNavigation(), // 바로 메인으로!
+        home: const SplashScreen(nextScreen: MainNavigation()), // 바로 메인으로!
       ),
     );
   }
