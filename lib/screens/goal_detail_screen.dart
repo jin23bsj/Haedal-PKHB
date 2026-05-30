@@ -244,11 +244,26 @@ class GoalDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTimeline(List<GoalRateEntry> history) {
+    // 날짜 오름차순 정렬 후 delta 재계산
+    final sorted = [...history]..sort((a, b) => a.date.compareTo(b.date));
+
+    // 각 항목의 실제 delta 계산 (이전 항목의 newRate 기준)
+    final List<int> deltas = [];
+    for (int i = 0; i < sorted.length; i++) {
+      final prevRate = i == 0 ? 0.0 : sorted[i - 1].newRate;
+      deltas.add(((sorted[i].newRate - prevRate) * 100).round());
+    }
+
+    // 화면에는 최신순(내림차순)으로 표시
+    final displayed = sorted.reversed.toList();
+    final displayedDeltas = deltas.reversed.toList();
+
     return Column(
-      children: history.asMap().entries.map((entry) {
+      children: displayed.asMap().entries.map((entry) {
         final i = entry.key;
         final item = entry.value;
-        final isLast = i == history.length - 1;
+        final delta = displayedDeltas[i];
+        final isLast = i == displayed.length - 1;
 
         return IntrinsicHeight(
           child: Row(
@@ -310,7 +325,7 @@ class GoalDetailScreen extends StatelessWidget {
                       ),
 
                       // 달성률 변화 (변화가 있을 때만)
-                      if (item.hasRateChange) ...[
+                      if (item.hasRateChange || delta != 0) ...[
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -323,10 +338,10 @@ class GoalDetailScreen extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.trending_up,
+                                  Icon(
+                                    delta >= 0 ? Icons.trending_up : Icons.trending_down,
                                     size: 14,
-                                    color: AppColors.primary,
+                                    color: delta >= 0 ? AppColors.primary : Colors.red[400]!,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
@@ -342,14 +357,16 @@ class GoalDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              item.increasePercent > 0
-                                  ? '+${item.increasePercent}% 증가'
-                                  : '${item.increasePercent}% 감소',
+                              delta > 0
+                                  ? '+$delta% 증가'
+                                  : delta < 0
+                                      ? '$delta% 감소'
+                                      : '변화 없음',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: item.increasePercent > 0
+                                color: delta > 0
                                     ? AppColors.primary
-                                    : Colors.red[400],
+                                    : delta < 0 ? Colors.red[400] : AppColors.textSecondary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),

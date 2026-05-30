@@ -111,14 +111,26 @@ class GoalProvider extends ChangeNotifier {
     required String memo,
     DateTime? date,
   }) {
+    final entryDate = date ?? DateTime.now();
     final entry = GoalRateEntry(
-      date: date ?? DateTime.now(),
+      date: entryDate,
       prevRate: prevRate,
       newRate: newRate,
       memo: memo,
     );
     if (!entry.shouldShow) return;
     _rateHistory.putIfAbsent(goalId, () => []).add(entry);
+
+    // 가장 최신 날짜 entry의 newRate로 goal 달성률 업데이트
+    final history = _rateHistory[goalId]!;
+    final latestEntry = history.reduce((a, b) => a.date.isAfter(b.date) ? a : b);
+    final idx = _goals.indexWhere((g) => g.id == goalId);
+    if (idx != -1 && _goals[idx].achievementRate != latestEntry.newRate) {
+      _goals[idx] = _goals[idx].copyWith(achievementRate: latestEntry.newRate);
+      _localRates[goalId] = latestEntry.newRate;
+      _saveLocalRates();
+    }
+
     notifyListeners();
   }
 

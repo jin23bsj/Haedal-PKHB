@@ -74,6 +74,14 @@ class _GoalListScreenState extends State<GoalListScreen>
   }
 
   Widget _buildGoalList(List<Goal> goals, BuildContext context) {
+    // D-day 가까운 순 정렬 (기한 없는 목표는 맨 뒤)
+    final sorted = [...goals]..sort((a, b) {
+      if (a.targetDate == null && b.targetDate == null) return 0;
+      if (a.targetDate == null) return 1;
+      if (b.targetDate == null) return -1;
+      return a.targetDate!.compareTo(b.targetDate!);
+    });
+    goals = sorted;
     if (goals.isEmpty) {
       return Center(
         child: Column(
