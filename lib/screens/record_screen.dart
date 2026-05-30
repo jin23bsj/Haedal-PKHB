@@ -590,8 +590,15 @@ class _RecordScreenState extends State<RecordScreen> {
           prevRate: prevRate,
           newRate: newRate >= 1.0 ? 1.0 : newRate,
           memo: memo,
+          date: _selectedDate,
         );
       }
+    }
+
+    // 저장 후 홈/분석 화면 데이터 새로고침
+    if (mounted) {
+      await context.read<RecordProvider>().fetchRecords();
+      await context.read<RecordProvider>().fetchSummary();
     }
 
     if (mounted) {

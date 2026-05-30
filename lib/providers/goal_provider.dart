@@ -109,9 +109,10 @@ class GoalProvider extends ChangeNotifier {
     required double prevRate,
     required double newRate,
     required String memo,
+    DateTime? date,
   }) {
     final entry = GoalRateEntry(
-      date: DateTime.now(),
+      date: date ?? DateTime.now(),
       prevRate: prevRate,
       newRate: newRate,
       memo: memo,
